@@ -2,10 +2,12 @@ import json, requests, re, os, time, random, ipaddress
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from preferences import prefs
 from logger import logger
+from feishu_push import push_feishu
 
 IP_LIST = {}
 accounts_list = {}
 hasE = False
+sign_results = []
 
 headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.198 Safari/537.36',
@@ -117,6 +119,7 @@ def checkIn(user, pwd, ip):
                     del accounts_list[user]
                     logger.warning(f"{user}: 密码错误")
                     hasE = True
+                    sign_results.append({"user": format_username(user), "success": False, "msg": "密码错误"})
                     return
                 url = 'https://bbs.binmt.cc/k_misign-sign.html'
                 resp = req.get(url, proxies=proxies, timeout=20)
@@ -127,15 +130,19 @@ def checkIn(user, pwd, ip):
                     url = f'https://bbs.binmt.cc/plugin.php?id=k_misign:sign&operation=qiandao&format=text&formhash={_formhash}'
                     resp = req.get(url, proxies=proxies, timeout=20)
                     resp.encoding = resp.apparent_encoding
+                    msg = CDATA(resp.text)
                     if '已签' in resp.text:
                         del accounts_list[user]
-                        logger.info(CDATA(resp.text))
+                        logger.info(msg)
                         prefs.put(user, prefs.getTime())
+                        sign_results.append({"user": format_username(user), "success": True, "msg": msg or "签到成功"})
                         return True
-                    logger.warning(CDATA(resp.text))
+                    logger.warning(msg)
+                    sign_results.append({"user": format_username(user), "success": False, "msg": msg or "签到失败"})
     except Exception as e:
         logger.warning(f"异常: {str(e)}")
         IP_LIST[ip] = False
+        sign_results.append({"user": format_username(user), "success": False, "msg": f"异常: {str(e)}"})
     return False
 
 def loginhash(data):
@@ -175,6 +182,7 @@ def start():
             accounts_list[username] = password
         elif YiQianDao:
             logger.info(f"{format_username(username)} 今日已签, 跳过签到")
+            sign_results.append({"user": format_username(username), "success": True, "msg": "今日已签到，跳过"})
     if accounts_list:
         load()
     if IP_LIST:
@@ -191,4 +199,5 @@ def start():
                 time.sleep(3)
 start()
 prefs.save()
+push_feishu(sign_results)
 if hasE: exit(1)
