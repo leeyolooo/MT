@@ -40,6 +40,10 @@ jobs:
     - name: 运行签到
       env:
         ACCOUNTS: ${{ secrets.ACCOUNTS }}
+        FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
+        FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
+        FEISHU_RECEIVE_ID: ${{ secrets.FEISHU_RECEIVE_ID }}
+        FEISHU_ID_TYPE: ${{ secrets.FEISHU_ID_TYPE }}
       run: python main.py
     - name: Empty commit
       run: |
